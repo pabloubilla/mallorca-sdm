@@ -1,0 +1,9 @@
+# Entorno recomendado: Python 3.12 (python3.12 -m venv .venv)
+geopandas>=1.1  # preprocessing: COD10X10 join
+rasterio>=1.5
+pandas>=2.0
+numpy>=2.0
+# Modelado (instalar aparte si hace falta):
+# torch
+# scikit-learn
+# matplotlib
