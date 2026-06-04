@@ -20,8 +20,10 @@ cd mallorca-sdm
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install torch scikit-learn matplotlib   # modelado y curvas
+pip install torch scikit-learn matplotlib SciencePlots   # modelado, curvas, estilo nature
 ```
+
+Figuras (`sampling_effort.py`, `map_grid_density_source.py`): estilo [SciencePlots nature](https://github.com/garrettj403/SciencePlots) vía `plot_style.py` (`science` + `nature` + `no-latex`).
 
 Usa siempre el `pip` del venv (`which pip` → `.venv/bin/pip`). Dependencias base en `requirements.txt`.
 
@@ -48,10 +50,10 @@ Muestrea covariables raster (`.tif`) en cada registro del GPKG. Configurar rutas
 ### 3. `preprocessing.py` (Python)
 
 - Join espacial a `data/raw/Flora_net.gpkg` → columna `COD10X10`.
-- **PAC / PAU:** una fila por cuadrícula 10×10 km (`site_id` = código de celda).
-- **POV / POU:** una fila por punto GPS (`site_id` = `lon_lat`); bioclim en el punto, no media de celda.
-- `grid_cells_{fuente}.csv`: celdas con datos (eje del esfuerzo de muestreo).
-- `species_matrix_{POV,POU}_grid.csv`: agregado por celda (solo referencia).
+- **PAC / PAU:** `species_matrix_{cls}.csv` — una fila por celda `UTMCODE1X1`.
+- **POV / POU (punto):** mismos nombres sin sufijo — fila por GPS; bioclim en el punto.
+- **POV / POU (grouped):** `species_matrix_{cls}_grouped.csv` — media bioclim y presencias por celda (como PA).
+- `grid_cells_{cls}.csv` y `grid_cells_{cls}_grouped.csv` para el muestreo por celdas.
 
 **Catálogo de especies:** presentes en ≥3 celdas PAC (`MIN_SPECIES_LIST_PAC_GRIDS`).
 
@@ -60,7 +62,8 @@ Muestrea covariables raster (`.tif`) en cada registro del GPKG. Configurar rutas
 | Fuente | Mínimo para incluir especie |
 |--------|----------------------------|
 | PAU    | ≥10 celdas con presencia   |
-| POV/POU | ≥10 puntos con presencia  |
+| POV/POU (punto) | ≥10 puntos con presencia |
+| POV/POU (`_grouped`) | ≥10 celdas con presencia |
 
 **Evaluación en PAC:** especies con ≥3 celdas PAC (catálogo).
 
@@ -73,27 +76,27 @@ Entrena un MLP en una fuente y evalúa AUC por especie en **PAC** (cuadrículas)
 | Fuente | Pérdida              | Datos de entrenamiento |
 |--------|----------------------|-------------------------|
 | PAU    | `BalancedBCELoss`    | Subconjunto de **celdas** |
-| POV/POU | `DeepMaxEntLoss`   | Todos los **puntos** dentro de las celdas muestreadas |
+| POV/POU | `DeepMaxEntLoss`   | Puntos dentro de celdas muestreadas, o celdas si `grouped=True` |
 
-`size_train` = número de celdas `COD10X10` incluidas en el esfuerzo (no número de puntos). En PO, al aumentar celdas crece el número de filas punto automáticamente.
-
-Definiciones del modelo en `models.py`.
+`size_train` = celdas muestreadas. `grouped=True` usa ficheros `_grouped` (PO alineado con PA).
 
 ```bash
 python run_model.py
 python -c "from run_model import run_model; run_model('POV', size_train=10)"
+python -c "from run_model import run_model; run_model('POV', size_train=10, grouped=True)"
 ```
 
 ### 5. `sampling_effort.py` (Python, opcional)
 
-Compara **PAU, POU y POV** variando el **esfuerzo geográfico** (`SIZE_GRID` = celdas de entrenamiento) y reporta AUC media en PAC.
+Compara **PAU, POU y POV** en modo **point** y **grouped** (PO agregado a celda). Figura **3×3**:
 
-**Dos magnitudes distintas (no confundir):**
+| Fila | Contenido |
+|------|-----------|
+| 1 | AUC vs `n_grids` (modo point) |
+| 2 | AUC vs `n_train_rows` (modo point) |
+| 3 | AUC vs `n_grids` (modo grouped; filas ≈ celdas también en PO) |
 
-| Variable | Significado |
-|----------|-------------|
-| `n_grids` / eje X de las curvas | Celdas `COD10X10` muestreadas para entrenar |
-| Prevalencia en paneles | % de celdas PAC donde la especie está presente |
+Columnas: bins de prevalencia (% celdas PAC). CSV incluye columna `data_mode`.
 
 **Bins de prevalencia en PAC** (para estratificar la AUC):
 

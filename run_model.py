@@ -16,8 +16,11 @@ from preprocessing import (
     MIN_SPECIES_LIST_PAC_GRIDS,
     MIN_TRAIN_OCC_GRID,
     MIN_TRAIN_OCC_POINT,
+    covariates_path,
+    file_suffix,
     grid_cells_path,
     is_po_source,
+    species_matrix_path,
 )
 
 MIN_TRAIN_SITES = 1  # min COD10X10 cells when subsampling training effort
@@ -52,32 +55,30 @@ def _load_source_subset(
     seed: int = 42,
     min_occ_grid: int = MIN_TRAIN_OCC_GRID,
     min_occ_point: int = MIN_TRAIN_OCC_POINT,
+    grouped: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
     """
     Load (X, Y) for training.
 
-    - PA (PAU): rows = COD10X10 cells; min occurrences counted on grids.
-    - PO (POV, POU): rows = GPS points; subsample n_grids cells, keep all
-      points inside; min occurrences counted on points.
+    grouped=False: PAU grids; POV/POU GPS points (subsample cells, keep points).
+    grouped=True: all sources at grid cell (PO mean bioclim per cell).
     """
-    meta: dict = {"n_grids": None, "n_points": None, "unit": "grid"}
+    meta: dict = {"n_grids": None, "n_points": None, "unit": "grid", "grouped": grouped}
 
-    y = pd.read_csv(
-        f"data/processed/species_matrix_{source}.csv", index_col="site_id"
-    )
-    x = pd.read_csv(
-        f"data/processed/covariates_{source}.csv", index_col="site_id"
-    )
+    y = pd.read_csv(species_matrix_path(source, grouped), index_col="site_id")
+    x = pd.read_csv(covariates_path(source, grouped), index_col="site_id")
     bioclim_cols = [c for c in x.columns if c != GRID_COL]
     common = y.index.intersection(x.index)
     y, x = y.loc[common], x.loc[common]
 
-    if is_po_source(source):
+    use_points = is_po_source(source) and not grouped
+
+    if use_points:
         meta["unit"] = "point"
         y = _filter_species_by_occurrence(y, min_occ_point, "points (full PO)")
-        grids_available = pd.read_csv(grid_cells_path(source))[GRID_COL].astype(
-            str
-        )
+        grids_available = pd.read_csv(grid_cells_path(source, grouped=False))[
+            GRID_COL
+        ].astype(str)
 
         if n_grids is not None:
             if n_grids < MIN_TRAIN_SITES:
@@ -141,31 +142,38 @@ def run_model(
     train_source: str,
     size_train: int | None = None,
     seed: int = 42,
-) -> pd.Series:
+    grouped: bool = False,
+) -> tuple[pd.Series, int]:
     """
     Train on a source and evaluate per-species AUC on PAC (grid cells).
 
     size_train: number of COD10X10 cells to include in the effort (for PO,
     all GPS points inside those cells are used for training).
+
+    Returns (per-species AUC on PAC, number of training matrix rows).
     """
     output_dir = "output"
     os.makedirs(output_dir, exist_ok=True)
-    ckpt_tag = f"{train_source}_n{size_train if size_train is not None else 'all'}"
+    sfx = file_suffix(train_source, grouped)
+    ckpt_tag = (
+        f"{train_source}{sfx}_n{size_train if size_train is not None else 'all'}"
+    )
     ckpt_path = os.path.join(output_dir, f"best_model_{ckpt_tag}.pt")
 
     x_train, y_train, meta = _load_source_subset(
-        train_source, size_train, seed=seed
+        train_source, size_train, seed=seed, grouped=grouped
     )
     x_pac, y_pac = _load_pac_eval()
 
+    mode = "grouped" if grouped else meta["unit"]
     if meta["unit"] == "point":
         print(
-            f"{train_source} — {meta['n_grids']} grids, "
+            f"{train_source} ({mode}) — {meta['n_grids']} grids, "
             f"{meta['n_points']:,} points, {y_train.shape[1]} species"
         )
     else:
         print(
-            f"{train_source} — {meta['n_grids']} grids, "
+            f"{train_source} ({mode}) — {meta['n_grids']} grids, "
             f"{y_train.shape[1]} species"
         )
     print(f"PAC — {y_pac.shape[0]} grids, {y_pac.shape[1]} species")
@@ -307,9 +315,9 @@ def run_model(
     )
     auc_series.to_csv(out_path, header=["AUC"])
 
-    return auc_series
+    return auc_series, len(y_train)
 
 
 if __name__ == "__main__":
-    auc = run_model("PAU", size_train=None)
-    print(f"Mean AUC: {auc.mean():.4f}  (n={auc.notna().sum()} species)")
+    auc, n_rows = run_model("PAU", size_train=None)
+    print(f"Mean AUC: {auc.mean():.4f}  (n={auc.notna().sum()} species, rows={n_rows})")
