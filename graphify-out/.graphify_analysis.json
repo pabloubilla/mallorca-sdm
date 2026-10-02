@@ -1,0 +1,319 @@
+{
+  "communities": {
+    "0": [
+      "covariables",
+      "map_grid_density_source",
+      "map_grid_density_source_main",
+      "map_grid_density_source_mallorca_limits",
+      "map_grid_density_source_py_geodataframe",
+      "map_grid_density_source_py_index",
+      "map_grid_density_source_rationale_1",
+      "map_grid_density_source_rationale_21",
+      "preprocessing",
+      "preprocessing_assign_cod10_grid",
+      "preprocessing_broadcast_cell_labels_to_pixels",
+      "preprocessing_cell_species_matrix",
+      "preprocessing_covariates_path",
+      "preprocessing_main",
+      "preprocessing_point_site_id",
+      "preprocessing_py_dataframe",
+      "preprocessing_rationale_1",
+      "preprocessing_rationale_111",
+      "preprocessing_rationale_150",
+      "preprocessing_rationale_92",
+      "preprocessing_save_grid_products",
+      "preprocessing_save_pa_pixel_products",
+      "preprocessing_save_point_products",
+      "preprocessing_species_matrix",
+      "preprocessing_species_matrix_path"
+    ],
+    "1": [
+      "dataloader",
+      "optimizer",
+      "preprocessing_file_suffix",
+      "preprocessing_grid_cells_path",
+      "preprocessing_is_po_source",
+      "run_model",
+      "run_model_filter_species_by_grid_occurrence",
+      "run_model_filter_species_by_occurrence",
+      "run_model_is_pa_pixel_matrix",
+      "run_model_load_pac_eval",
+      "run_model_load_source_subset",
+      "run_model_per_species_auc",
+      "run_model_py_dataframe",
+      "run_model_py_index",
+      "run_model_py_module",
+      "run_model_py_series",
+      "run_model_rationale_140",
+      "run_model_rationale_256",
+      "run_model_rationale_287",
+      "run_model_rationale_62",
+      "run_model_run_model",
+      "run_model_run_training_epoch",
+      "run_model_sample_grids",
+      "run_model_select_feature_cols",
+      "run_model_subsample_pa_by_grids"
+    ],
+    "2": [
+      "models_deepmaxentloss",
+      "models_deepmaxentloss_forward",
+      "models_deepmaxentloss_init",
+      "optimal_model",
+      "optimal_model_baseline_pcts",
+      "optimal_model_build_training_mix",
+      "optimal_model_main",
+      "optimal_model_mean_auc_on_pac",
+      "optimal_model_mix_label",
+      "optimal_model_plot_optimal",
+      "optimal_model_print_mix_vs_baseline",
+      "optimal_model_py_dataframe",
+      "optimal_model_py_index",
+      "optimal_model_py_path",
+      "optimal_model_py_series",
+      "optimal_model_rationale_1",
+      "optimal_model_rationale_180",
+      "optimal_model_run_lonlat_baselines",
+      "optimal_model_subsample",
+      "plot_style",
+      "plot_style_apply",
+      "plot_style_rationale_1",
+      "run_model_aggregate_pixel_scores_to_cells",
+      "run_model_rationale_111"
+    ],
+    "3": [
+      "extract_raster_data",
+      "extract_raster_data_assign_pa_grids",
+      "extract_raster_data_cell_class_map",
+      "extract_raster_data_collect_raster_files",
+      "extract_raster_data_count_inside_bounds",
+      "extract_raster_data_extract_pa_pixels",
+      "extract_raster_data_extract_po_points",
+      "extract_raster_data_main",
+      "extract_raster_data_maybe_subsample",
+      "extract_raster_data_pixel_centers_in_polygon",
+      "extract_raster_data_py_dataframe",
+      "extract_raster_data_py_geodataframe",
+      "extract_raster_data_py_path",
+      "extract_raster_data_raster_column_names",
+      "extract_raster_data_rationale_1",
+      "extract_raster_data_rationale_134",
+      "extract_raster_data_rationale_214",
+      "extract_raster_data_rationale_227",
+      "extract_raster_data_rationale_51",
+      "extract_raster_data_rationale_72",
+      "extract_raster_data_sample_points_from_raster",
+      "extract_raster_data_sample_rasters_at_pixels"
+    ],
+    "4": [
+      "intersection_pov_pou_pac",
+      "intersection_pov_pou_pac_intersection_pac_pov_pou",
+      "intersection_pov_pou_pac_py_index",
+      "intersection_pov_pou_pac_rationale_1",
+      "namespace",
+      "sampling_effort",
+      "sampling_effort_output_paths",
+      "sampling_effort_parse_args",
+      "sampling_effort_plot_sampling_effort",
+      "sampling_effort_py_dataframe",
+      "sampling_effort_py_index",
+      "sampling_effort_py_path",
+      "sampling_effort_rationale_1",
+      "sampling_effort_resolve_eval_species",
+      "sampling_effort_sampling_effort_per_source"
+    ],
+    "5": [
+      "models",
+      "models_abnmodel",
+      "models_abnmodel_forward",
+      "models_biasl2penalty",
+      "models_biasl2penalty_forward",
+      "models_biasl2penalty_init"
+    ],
+    "6": [
+      "models_abnmodel_init",
+      "models_deepmaxentlossbias",
+      "models_deepmaxentlossbias_forward",
+      "models_deepmaxentlossbias_init",
+      "models_mlp_init",
+      "models_mlpwithplotbias_init"
+    ],
+    "7": [
+      "models_integratedloss",
+      "models_integratedloss_forward",
+      "models_integratedloss_init",
+      "models_py_module",
+      "models_rationale_241"
+    ],
+    "8": [
+      "models_mlp",
+      "models_mlp_forward",
+      "models_mlp_get_features",
+      "models_rationale_96",
+      "tensor"
+    ],
+    "9": [
+      "models_balancedbceloss",
+      "models_balancedbceloss_forward",
+      "models_balancedbceloss_init",
+      "models_rationale_20"
+    ],
+    "10": [
+      "models_bernoullifromlograteloss",
+      "models_bernoullifromlograteloss_forward",
+      "models_bernoullifromlograteloss_init",
+      "models_rationale_168"
+    ],
+    "11": [
+      "models_poissonlograteloss",
+      "models_poissonlograteloss_forward",
+      "models_poissonlograteloss_init",
+      "models_rationale_212"
+    ],
+    "12": [
+      "models_rationale_111",
+      "models_sdmwithbias",
+      "models_sdmwithbias_forward",
+      "models_sdmwithbias_init"
+    ],
+    "13": [
+      "models_abnloss",
+      "models_abnloss_forward",
+      "models_abnloss_init"
+    ],
+    "14": [
+      "models_mlpwithplotbias",
+      "models_mlpwithplotbias_forward",
+      "models_rationale_385"
+    ]
+  },
+  "cohesion": {
+    "0": 0.16666666666666666,
+    "1": 0.18666666666666668,
+    "2": 0.14855072463768115,
+    "3": 0.21645021645021645,
+    "4": 0.2,
+    "5": 0.3333333333333333,
+    "6": 0.3333333333333333,
+    "7": 0.4,
+    "8": 0.6,
+    "9": 0.5,
+    "10": 0.5,
+    "11": 0.5,
+    "12": 0.5,
+    "13": 0.6666666666666666,
+    "14": 0.6666666666666666
+  },
+  "gods": [
+    {
+      "id": "run_model_run_model",
+      "label": "run_model()",
+      "degree": 18
+    },
+    {
+      "id": "run_model_load_source_subset",
+      "label": "_load_source_subset()",
+      "degree": 17
+    },
+    {
+      "id": "models_mlp",
+      "label": "MLP",
+      "degree": 10
+    },
+    {
+      "id": "optimal_model_main",
+      "label": "main()",
+      "degree": 10
+    },
+    {
+      "id": "preprocessing_grid_cells_path",
+      "label": "grid_cells_path()",
+      "degree": 10
+    },
+    {
+      "id": "run_model_load_pac_eval",
+      "label": "_load_pac_eval()",
+      "degree": 10
+    },
+    {
+      "id": "extract_raster_data_main",
+      "label": "main()",
+      "degree": 9
+    },
+    {
+      "id": "optimal_model_mean_auc_on_pac",
+      "label": "_mean_auc_on_pac()",
+      "degree": 9
+    },
+    {
+      "id": "preprocessing_species_matrix_path",
+      "label": "species_matrix_path()",
+      "degree": 9
+    },
+    {
+      "id": "preprocessing_save_pa_pixel_products",
+      "label": "_save_pa_pixel_products()",
+      "degree": 9
+    }
+  ],
+  "surprises": [
+    {
+      "source": "_run_training_epoch()",
+      "target": "MLP",
+      "source_files": [
+        "run_model.py",
+        "models.py"
+      ],
+      "confidence": "INFERRED",
+      "relation": "uses",
+      "why": "inferred connection - not explicitly stated in source; connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "main()",
+      "target": "apply()",
+      "source_files": [
+        "map_grid_density_source.py",
+        "plot_style.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "_mean_auc_on_pac()",
+      "target": "BalancedBCELoss",
+      "source_files": [
+        "optimal_model.py",
+        "models.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "run_model()",
+      "target": "BalancedBCELoss",
+      "source_files": [
+        "run_model.py",
+        "models.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "run_model()",
+      "target": "DeepMaxEntLoss",
+      "source_files": [
+        "run_model.py",
+        "models.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

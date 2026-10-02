@@ -24,11 +24,26 @@ PREVALENCE_BINS = [
     ("common", ">30% PAC cells", lambda p: p > 30),
 ]
 
-# (row, data_mode filter, x column, x label)
+# (data_mode filter, x column, x label, short row label for left axis)
 PLOT_ROWS = [
-    ("point", "point", "n_grids", "1×1 km grids (point mode)"),
-    ("point", "point", "n_train_rows", "Training rows (point mode)"),
-    ("grouped", "grouped", "n_grids", "1×1 km grids (PO grouped)"),
+    (
+        "point",
+        "n_grids",
+        "Number of 1×1 km cells sampled",
+        "Point data\nX = cells",
+    ),
+    (
+        "point",
+        "n_train_rows",
+        "Number of training examples",
+        "Point data\nX = examples",
+    ),
+    (
+        "grouped",
+        "n_grids",
+        "Number of 1×1 km cells sampled",
+        "Grouped PO\nX = cells",
+    ),
 ]
 
 
@@ -67,10 +82,10 @@ def plot_sampling_effort(
     title_suffix = (
         "" if eval_species_mode == "all" else f" | {eval_species_mode}"
     )
-    fig, axes = plt.subplots(3, 3, figsize=(15, 11), sharey="row")
+    fig, axes = plt.subplots(3, 3, figsize=(15, 13.5), sharey="row")
     for col, (bin_id, bin_label, _) in enumerate(PREVALENCE_BINS):
         sub_bin = results[results["prevalence_bin"] == bin_id]
-        for row, (mode, _m, x_col, x_label) in enumerate(PLOT_ROWS):
+        for row, (mode, x_col, x_label, row_label) in enumerate(PLOT_ROWS):
             ax = axes[row, col]
             sub = sub_bin[sub_bin["data_mode"] == mode]
             for source in TRAIN_SOURCES:
@@ -81,13 +96,32 @@ def plot_sampling_effort(
             ax.set_xscale("log")
             ax.set_xlabel(x_label, fontsize=8)
             if row == 0:
-                ax.set_title(bin_label)
+                ax.set_title(f"Species in {bin_label}", fontsize=10)
+            if col == 0:
+                ax.set_ylabel(f"Mean AUC on PAC\n({row_label})", fontsize=8)
             ax.grid(True, alpha=0.3)
-        axes[row, 0].set_ylabel("Mean AUC")
 
-    axes[2, 2].legend(loc="lower right", fontsize=8)
-    fig.suptitle("Sampling effort 3×3: grids / rows / PO grouped" + title_suffix)
-    fig.tight_layout()
+    axes[2, 2].legend(title="Train source", loc="lower right", fontsize=8)
+    fig.suptitle(
+        "Learning curves: more training data vs mean AUC on PAC"
+        + title_suffix,
+        fontsize=13,
+        y=0.995,
+    )
+    fig.text(
+        0.5,
+        0.955,
+        "Each line = one train source (PAU incomplete grids; POV/POU presence-only points).\n"
+        "Columns split species by how common they are on the PAC atlas.\n"
+        "Row 1: keep all GPS points / PA pixels inside sampled cells; X-axis = cells.\n"
+        "Row 2: same models as row 1; X-axis = training examples (points or pixels).\n"
+        "Row 3: collapse PO points to one training row per 1×1 km cell; X-axis = cells.",
+        ha="center",
+        va="top",
+        fontsize=9,
+        linespacing=1.35,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.88])
     output_png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_png, dpi=150, bbox_inches="tight")
     plt.show()

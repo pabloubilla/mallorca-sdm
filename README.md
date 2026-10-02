@@ -6,10 +6,14 @@ Benchmark de **modelos de distribución de especies profundos** (Deep SDM) con o
 
 | Clase   | Significado                                    | Origen (aprox.)                    | Unidad en el modelo |
 | ------- | ---------------------------------------------- | ---------------------------------- | ------------------- |
-| **PAC** | Presencia–ausencia completa (cuadrícula Flora) | Flora + GBIF (incertidumbre 707 m) | Cuadrícula `COD10X10` |
-| **PAU** | Presencia–ausencia incompleta                  | Flora sin completar cuadrícula     | Cuadrícula `COD10X10` |
+| **PAC** | Presencia–ausencia completa                    | Flora GBIF 707 m + Sáez/Puig Major + Biel GBO (celdas en cuadrículas) | Celda (1 km o 500 m) → centroide + incertidumbre |
+| **PAU** | Presencia–ausencia incompleta                  | Flora incompleta + Biel GBO fuera de cuadrículas PAC | Idem |
 | **POV** | Presencia validada (puntos GPS)                | Biodibal                           | Punto (`lon`/`lat`) |
 | **POU** | Presencia no validada (puntos GPS)             | GBIF                               | Punto (`lon`/`lat`) |
+
+`PAC` / `PAU` = **calidad de muestreo**, no tamaño de celda. PA se representa como **centroide + `coordinateUncertaintyInMeters`** (semidiagonal: ~707 m a 1 km; ~354 m a 500 m). Columna **`source`**: `GBIF`, `Saez`, `Biel`, `Biodibal`.
+
+Biel: `data/raw/Biel/20260823_FLORA_GBO_Reduida.xlsx` (solo Mallorca) + cuadrículas `20260620_Quadrícules_GBO.xlsx` (qué celdas son PAC). Letras A–D en UTM = grano 500 m.
 
 Los nombres científicos se unifican contra el backbone de GBIF en `data_preparation.R`.
 
@@ -32,7 +36,7 @@ Usa siempre el `pip` del venv (`which pip` → `.venv/bin/pip`). Dependencias ba
 Ejecutar los pasos **en este orden** (cada uno depende del anterior):
 
 ```
-1. data_preparation.R       → data/raw/full_data_clean_saez.gpkg
+1. data_preparation.R       → data/raw/full_data_saez.gpkg
 2. extract_raster_data.py   → data/raw/extracted_data.csv (+ .gpkg)
 3. preprocessing.py         → data/processed/ (matrices y covariables)
 4. run_model.py             → output/best_model_*.pt, output/auc_per_species_*.csv
@@ -41,16 +45,23 @@ Ejecutar los pasos **en este orden** (cada uno depende del anterior):
 
 ### 1. `data_preparation.R` (R)
 
-Carga Biodibal, GBIF, Flora/Sáez; filtra y fusiona geometrías; asigna `class`; resuelve taxonomía con **rgbif** (`name_backbone` / revisión manual en `taxonkey_list_review.xlsx`). Salida principal: `data/raw/full_data_clean_saez.gpkg`.
+Carga Biodibal, GBIF, Flora/Sáez, Biel; filtra y fusiona geometrías; asigna `class`; resuelve taxonomía con **rgbif** (`name_backbone` / revisión manual en `taxonkey_list_review.xlsx`). Salida principal: `data/raw/full_data_saez.gpkg` (ocurrencias, sin covariables). Alternativa Python: `rebuild_full_data_saez.py`.
 
 ### 2. `extract_raster_data.py` (Python)
 
-Muestrea covariables raster (`.tif`) en cada registro del GPKG. Configurar rutas en `RASTER_FOLDERS` (Bioclim, CORINE, pendiente, elevación, etc.). Deduplica geometrías para el extract y reexpande a todas las filas. Salida: `data/raw/extracted_data.csv` (y opcionalmente `.gpkg`).
+Muestrea covariables raster (`.tif`) del GPKG. Configurar rutas en `RASTER_FOLDERS`.
+
+| Clase | Extract |
+|-------|---------|
+| **PAC / PAU** | **Una fila por píxel raster (~100 m)** dentro de cada celda 1×1 km; sin agregar covariables (predecir por píxel → agregar después) |
+| **POV / POU** | Muestreo en el punto GPS; deduplica geometrías y reexpande |
+
+Backups: `extracted_rasters_pa_pixels.csv`, `pa_occurrences.csv`, `extracted_rasters_po_points.csv`. Salida: `data/raw/extracted_data.csv` (+ `.gpkg`, `extract_mode`: `cell_pixel` | `point`).
 
 ### 3. `preprocessing.py` (Python)
 
 - Join espacial a `data/raw/Flora_net.gpkg` → columna `COD10X10`.
-- **PAC / PAU:** `species_matrix_{cls}.csv` — una fila por celda `UTMCODE1X1`.
+- **PAC / PAU:** `species_matrix_{cls}.csv` — una fila por **píxel raster** (~100 m); etiquetas de especie a nivel de celda `UTMCODE1X1` (broadcast). AUC en PAC: media de predicciones píxel → celda.
 - **POV / POU (punto):** mismos nombres sin sufijo — fila por GPS; bioclim en el punto.
 - **POV / POU (grouped):** `species_matrix_{cls}_grouped.csv` — media bioclim y presencias por celda (como PA).
 - `grid_cells_{cls}.csv` y `grid_cells_{cls}_grouped.csv` para el muestreo por celdas.

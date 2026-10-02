@@ -34,7 +34,7 @@ The study focuses on **terrestrial vascular plants** on Mallorca (Balearic Islan
 | POV | Presence-only, validated | Biodibal | GPS point (also aggregable to grid) |
 | POU | Presence-only, unvalidated | GBIF | GPS point |
 
-Scientific names were matched to GBIF taxon keys (`name_backbone` and manual review). Geometries were cleaned and exported to `full_data_clean_saez.gpkg`.
+Scientific names were matched to GBIF taxon keys (`name_backbone` and manual review). Geometries were cleaned and exported to `full_data_saez.gpkg`.
 
 ### 2.2 Environmental covariates
 

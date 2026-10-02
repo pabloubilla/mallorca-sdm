@@ -15,4 +15,6 @@ COVARS_LIST=[
        'corine_422', 'corine_512', 'corine_521', 'corine_523',
         'slope',# tiene 1100 NA, se puede interpolar
        'elev_mallorca_25831',
+       'lon',  # EPSG:25831 easting (m)
+       'lat',  # EPSG:25831 northing (m)
 ]

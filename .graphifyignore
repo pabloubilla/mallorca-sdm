@@ -1,0 +1,11 @@
+data/
+output/
+.venv/
+__pycache__/
+graphify-out/
+**/*.gpkg
+**/*.tif
+**/*.pt
+**/*.pdf
+references/
+*.gpkg

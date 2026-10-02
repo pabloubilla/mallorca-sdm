@@ -8,6 +8,7 @@ from itertools import product
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 import torch
@@ -17,7 +18,13 @@ from torch.utils.data import DataLoader, TensorDataset, random_split
 
 from models import MLP, BalancedBCELoss, DeepMaxEntLoss
 from plot_style import apply as apply_plot_style
-from run_model import _load_pac_eval, _load_source_subset
+from run_model import (
+    SPATIAL_BASELINE_COLS,
+    _aggregate_pixel_scores_to_cells,
+    _load_pac_eval,
+    _load_source_subset,
+    run_model,
+)
 
 TRAIN_SOURCES = ["PAU", "POV", "POU"]
 FRACTIONS = (0.0, 0.5, 1.0)
@@ -72,6 +79,7 @@ def _mean_auc_on_pac(
     x_pac: pd.DataFrame,
     y_pac: pd.DataFrame,
     use_bce: bool,
+    pac_grids: pd.Series | None = None,
 ) -> float:
     X_tr = x_train.values.astype(np.float32)
     Y_tr = y_train.values.astype(np.float32)
@@ -145,15 +153,80 @@ def _mean_auc_on_pac(
     with torch.no_grad():
         scores = model(torch.tensor(X_pac)).sigmoid().numpy()
 
+    score_df = pd.DataFrame(scores, columns=species, index=y_pac.index)
+    if pac_grids is not None:
+        y_eval, score_df = _aggregate_pixel_scores_to_cells(
+            y_pac, score_df, pac_grids
+        )
+    else:
+        y_eval = y_pac
+
     aucs = []
-    for j, sp in enumerate(species):
-        if sp not in y_pac.columns:
+    for sp in species:
+        if sp not in y_eval.columns:
             continue
         try:
-            aucs.append(roc_auc_score(y_pac[sp].values, scores[:, j]))
+            aucs.append(roc_auc_score(y_eval[sp].values, score_df[sp].values))
         except ValueError:
             pass
     return float(np.mean(aucs)) if aucs else float("nan")
+
+
+def _baseline_pcts(source: str) -> dict[str, float]:
+    return {s: 1.0 if s == source else 0.0 for s in TRAIN_SOURCES}
+
+
+def _run_lonlat_baselines(species_cols: pd.Index) -> list[dict]:
+    """Train each source with only lon/lat via run_model (spatial baseline)."""
+    rows = []
+    feature_cols = list(SPATIAL_BASELINE_COLS)
+    for src in TRAIN_SOURCES:
+        label = f"BASELINE_{src}_lonlat"
+        print(f"\n=== {label} (features: {feature_cols}) ===")
+        auc_series, n_rows = run_model(
+            src,
+            size_train=None,
+            seed=SEED,
+            grouped=False,
+            feature_cols=feature_cols,
+            species_cols=species_cols,
+            num_epochs=NUM_EPOCHS,
+        )
+        mean_auc = float(auc_series.mean())
+        pcts = _baseline_pcts(src)
+        print(f"  rows={n_rows:,}  mean_auc={mean_auc:.4f}")
+        rows.append(
+            {
+                "label": label,
+                "model_type": "baseline_lonlat",
+                "pct_PAU": pcts["PAU"],
+                "pct_POV": pcts["POV"],
+                "pct_POU": pcts["POU"],
+                "n_rows": n_rows,
+                "mean_auc_pac": mean_auc,
+            }
+        )
+    return rows
+
+
+def _print_mix_vs_baseline(results: pd.DataFrame) -> None:
+    mixes = results[results["model_type"] == "mix"]
+    baselines = results[results["model_type"] == "baseline_lonlat"]
+    if mixes.empty or baselines.empty:
+        return
+    best_mix = mixes.loc[mixes["mean_auc_pac"].idxmax()]
+    best_baseline = baselines.loc[baselines["mean_auc_pac"].idxmax()]
+    print("\n--- Mix vs spatial baseline (lon/lat only) ---")
+    print(
+        f"Best full-covariate mix: {best_mix['label']} "
+        f"(AUC={best_mix['mean_auc_pac']:.4f})"
+    )
+    print(
+        f"Best lon/lat baseline:   {best_baseline['label']} "
+        f"(AUC={best_baseline['mean_auc_pac']:.4f})"
+    )
+    delta = best_mix["mean_auc_pac"] - best_baseline["mean_auc_pac"]
+    print(f"Delta (mix − baseline):  {delta:+.4f}")
 
 
 def plot_optimal(results: pd.DataFrame, output_png: Path = OUTPUT_PNG) -> None:
@@ -162,13 +235,37 @@ def plot_optimal(results: pd.DataFrame, output_png: Path = OUTPUT_PNG) -> None:
         print("No results to plot.")
         return
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(9, 9))
     plot_df = results.sort_values("mean_auc_pac", ascending=True)
-    colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(plot_df)))
-    ax.barh(plot_df["label"], plot_df["mean_auc_pac"], color=colors)
+    is_baseline = plot_df["model_type"] == "baseline_lonlat"
+    n_mix = (~is_baseline).sum()
+    colors = [None] * len(plot_df)
+    if n_mix:
+        mix_colors = plt.cm.viridis(np.linspace(0.2, 0.9, n_mix))
+        mix_i = 0
+        for i, baseline in enumerate(is_baseline):
+            if baseline:
+                colors[i] = "#c0392b"
+            else:
+                colors[i] = mix_colors[mix_i]
+                mix_i += 1
+    bars = ax.barh(plot_df["label"], plot_df["mean_auc_pac"], color=colors)
+    for bar, baseline in zip(bars, is_baseline):
+        if baseline:
+            bar.set_edgecolor("black")
+            bar.set_linewidth(1.2)
     ax.set_xlabel("Mean per-species AUC on PAC")
-    ax.set_title("Mixed training sources (fraction of rows per source)")
+    ax.set_title(
+        "Mixed training sources (full covariates) vs lon/lat-only baselines"
+    )
     ax.set_xlim(0, 1)
+    ax.legend(
+        handles=[
+            Patch(facecolor="#c0392b", edgecolor="black", label="lon/lat baseline"),
+            Patch(facecolor=plt.cm.viridis(0.55), label="full covariates mix"),
+        ],
+        loc="lower right",
+    )
     fig.tight_layout()
     output_png.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_png, dpi=150, bbox_inches="tight", facecolor="white")
@@ -185,7 +282,14 @@ def main(plot_only: bool = False):
                 f"No results at {OUTPUT_CSV}. Run without --plot-only first."
             )
         results = pd.read_csv(OUTPUT_CSV)
+        if "model_type" not in results.columns:
+            results["model_type"] = np.where(
+                results["label"].str.startswith("BASELINE_"),
+                "baseline_lonlat",
+                "mix",
+            )
         print(f"Loaded {OUTPUT_CSV} ({len(results)} rows)")
+        _print_mix_vs_baseline(results)
         plot_optimal(results)
         return
 
@@ -199,7 +303,7 @@ def main(plot_only: bool = False):
     species_cols = pd.Index(cols)
     print(f"Training species (intersection): {len(species_cols)}")
 
-    x_pac, y_pac = _load_pac_eval()
+    x_pac, y_pac, pac_grids = _load_pac_eval()
     rows = []
 
     combos = list(product(FRACTIONS, repeat=len(TRAIN_SOURCES)))
@@ -213,17 +317,28 @@ def main(plot_only: bool = False):
 
         mixed = _build_training_mix(pcts, species_cols, seed=SEED)
         if mixed[0] is None:
-            rows.append({**pcts, "label": label, "n_rows": 0, "mean_auc_pac": np.nan})
+            rows.append(
+                {
+                    **pcts,
+                    "label": label,
+                    "model_type": "mix",
+                    "n_rows": 0,
+                    "mean_auc_pac": np.nan,
+                }
+            )
             continue
 
         x_train, y_train = mixed
         use_bce = pcts["PAU"] > 0
-        mean_auc = _mean_auc_on_pac(x_train, y_train, x_pac, y_pac, use_bce=use_bce)
+        mean_auc = _mean_auc_on_pac(
+            x_train, y_train, x_pac, y_pac, use_bce=use_bce, pac_grids=pac_grids
+        )
         print(f"  rows={len(x_train):,}  mean_auc={mean_auc:.4f}  loss={'BCE' if use_bce else 'MaxEnt'}")
 
         rows.append(
             {
                 "label": label,
+                "model_type": "mix",
                 "pct_PAU": pcts["PAU"],
                 "pct_POV": pcts["POV"],
                 "pct_POU": pcts["POU"],
@@ -232,9 +347,12 @@ def main(plot_only: bool = False):
             }
         )
 
+    rows.extend(_run_lonlat_baselines(species_cols))
+
     results = pd.DataFrame(rows).sort_values("mean_auc_pac", ascending=False)
     results.to_csv(OUTPUT_CSV, index=False)
     print(f"\nSaved {OUTPUT_CSV}")
+    _print_mix_vs_baseline(results)
     plot_optimal(results)
 
 

@@ -1,0 +1,140 @@
+{
+  "analyse_data.R": {
+    "mtime": 1780476558.0,
+    "seen": 1790346303.637932,
+    "ast_hash": "0ba1f0f711c234e49ecd3b1388b3f09b",
+    "semantic_hash": "0ba1f0f711c234e49ecd3b1388b3f09b"
+  },
+  "covariables.py": {
+    "mtime": 1780653630.0,
+    "seen": 1790346303.6379352,
+    "ast_hash": "f6de2916161d9ece5edff08a0c0eb29d",
+    "semantic_hash": "f6de2916161d9ece5edff08a0c0eb29d"
+  },
+  "data_preparation.R": {
+    "mtime": 1790350339.7371716,
+    "seen": 1790350448.246089,
+    "ast_hash": "93c603030c2534a70533eb02423df725",
+    "semantic_hash": ""
+  },
+  "extract_raster_data.py": {
+    "mtime": 1784032547.0,
+    "seen": 1790346303.6379383,
+    "ast_hash": "d54c225fe250133e092cea98667a72fa",
+    "semantic_hash": "d54c225fe250133e092cea98667a72fa"
+  },
+  "intersection_POV_POU_PAC.py": {
+    "mtime": 1780559995.0,
+    "seen": 1790346303.6379392,
+    "ast_hash": "85fe9852fda64ffdea67a2f350add3a8",
+    "semantic_hash": "85fe9852fda64ffdea67a2f350add3a8"
+  },
+  "map_grid_density_source.py": {
+    "mtime": 1780579955.0,
+    "seen": 1790346303.6379402,
+    "ast_hash": "cc9e46d46ba67f947c48a11e2d4257e8",
+    "semantic_hash": "cc9e46d46ba67f947c48a11e2d4257e8"
+  },
+  "models.py": {
+    "mtime": 1780476558.0,
+    "seen": 1790346303.6379414,
+    "ast_hash": "9e8a6b886a3b6af1dcc25fef6bbe8ffc",
+    "semantic_hash": "9e8a6b886a3b6af1dcc25fef6bbe8ffc"
+  },
+  "optimal_model.py": {
+    "mtime": 1780664207.0,
+    "seen": 1790346303.637942,
+    "ast_hash": "67f019058b6b03d65c24a111d88638ae",
+    "semantic_hash": "67f019058b6b03d65c24a111d88638ae"
+  },
+  "plot_style.py": {
+    "mtime": 1780579546.0,
+    "seen": 1790346303.6379428,
+    "ast_hash": "4dd0b2c3e3ca192ac4dd5ccd1008cdc7",
+    "semantic_hash": "4dd0b2c3e3ca192ac4dd5ccd1008cdc7"
+  },
+  "preprocessing.py": {
+    "mtime": 1780664170.0,
+    "seen": 1790346303.6379437,
+    "ast_hash": "ea114c9ca47a8e5e870c7f4ae52a4f1b",
+    "semantic_hash": "ea114c9ca47a8e5e870c7f4ae52a4f1b"
+  },
+  "run_model.py": {
+    "mtime": 1780664420.0,
+    "seen": 1790346303.637945,
+    "ast_hash": "cbae7f22710d6d65c69b1bed6f7b4424",
+    "semantic_hash": "cbae7f22710d6d65c69b1bed6f7b4424"
+  },
+  "sampling_effort.py": {
+    "mtime": 1780581351.0,
+    "seen": 1790346303.637946,
+    "ast_hash": "f98a5ccda8a9d6e6782fcb46649d7b66",
+    "semantic_hash": "f98a5ccda8a9d6e6782fcb46649d7b66"
+  },
+  "AGENTS.md": {
+    "mtime": 1790350414.0877202,
+    "seen": 1790350448.2460968,
+    "ast_hash": "5087f7cc10078a1c574cfabc5efab153",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1790350420.0870385,
+    "seen": 1790350448.2460978,
+    "ast_hash": "9f24d999add5918c233a702525eb83f5",
+    "semantic_hash": ""
+  },
+  "checklist.md": {
+    "mtime": 1780581464.0,
+    "seen": 1790350448.2460985,
+    "ast_hash": "dd7e0bd79ab993f85df8a0e6c17ae8eb",
+    "semantic_hash": ""
+  },
+  "manuscript_draft.md": {
+    "mtime": 1780582487.0,
+    "seen": 1790350448.2460992,
+    "ast_hash": "33d9bf51a54f69799258b45bed26711d",
+    "semantic_hash": ""
+  },
+  "notes.md": {
+    "mtime": 1780664209.0,
+    "seen": 1790350448.2460997,
+    "ast_hash": "ac58f217420314fd23023370f1a4e34b",
+    "semantic_hash": ""
+  },
+  "product/current-state.md": {
+    "mtime": 1790350413.7689703,
+    "seen": 1790350448.2461,
+    "ast_hash": "da3b9805425ea8c1b11089d48f434159",
+    "semantic_hash": ""
+  },
+  "product/decisions.md": {
+    "mtime": 1790350381.582623,
+    "seen": 1790350448.2461004,
+    "ast_hash": "1110b9187586d1ed05ae6c032f51c214",
+    "semantic_hash": ""
+  },
+  "product/market-stress.md": {
+    "mtime": 1790346274.564426,
+    "seen": 1790350448.2461011,
+    "ast_hash": "54ec5450f644adb80280102af07f2e3b",
+    "semantic_hash": ""
+  },
+  "product/roadmap.md": {
+    "mtime": 1790346263.7287335,
+    "seen": 1790350448.2461019,
+    "ast_hash": "5e841179223a08604762658a17a99f04",
+    "semantic_hash": ""
+  },
+  "product/vision.md": {
+    "mtime": 1790346258.159147,
+    "seen": 1790350448.2461023,
+    "ast_hash": "3967c0dbacc6e65e0d9374ba77f7d82e",
+    "semantic_hash": ""
+  },
+  "requirements.txt": {
+    "mtime": 1780579549.0,
+    "seen": 1790350448.2461028,
+    "ast_hash": "99ca22e89cb375ea64fd4a31fff40809",
+    "semantic_hash": ""
+  }
+}

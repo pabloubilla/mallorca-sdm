@@ -1,4 +1,4 @@
-"""Processed matrices: PA by grid; PO by point (default) + grid-mean grouped (_grouped)."""
+"""Processed matrices: PA by raster pixel; PO by point + grid-mean grouped (_grouped)."""
 import os
 
 import geopandas as gpd
@@ -9,19 +9,20 @@ from covariables import COVARS_LIST
 
 FLORA_NET_PATH = "data/raw/Flora_net.gpkg"
 EXTRACTED_CSV = "data/raw/extracted_data.csv"
+PA_OCCURRENCES_CSV = "data/raw/pa_occurrences.csv"
 GRID_COL = "UTMCODE1X1"
 GROUPED_SUFFIX = "_grouped"
+PIXEL_ID_COL = "pixel_id"
 
 PA_CLASSES = ("PAC", "PAU")
 PO_CLASSES = ("POV", "POU")
 
-MIN_SPECIES_LIST_PAC_GRIDS = 1 # minimum number of cells in PAC to include a species in the catalog
-MIN_TRAIN_OCC_GRID = 1 # minimum number of cells in the training set to include a species in the training set
-MIN_TRAIN_OCC_POINT = 2 # minimum number of points in the training set to include a species in the training set
+MIN_SPECIES_LIST_PAC_GRIDS = 1
+MIN_TRAIN_OCC_GRID = 1
+MIN_TRAIN_OCC_POINT = 2
 
 
 def file_suffix(source: str, grouped: bool = False) -> str:
-    """PO only: '_grouped' files. PA (PAC/PAU) always use the grid files without suffix."""
     if grouped and is_po_source(source):
         return GROUPED_SUFFIX
     return ""
@@ -49,6 +50,9 @@ def assign_cod10_grid(df: pd.DataFrame) -> pd.DataFrame:
         geometry=gpd.points_from_xy(df["lon"], df["lat"]),
         crs="EPSG:25831",
     )
+    # Extract concat leaves empty UTMCODE1X1 on PO; drop so sjoin keeps GRID_COL name.
+    if GRID_COL in gdf.columns:
+        gdf = gdf.drop(columns=[GRID_COL])
     net = gpd.read_file(FLORA_NET_PATH)[[GRID_COL, "geometry"]]
     joined = gpd.sjoin(gdf, net, how="left", predicate="within")
     if joined.index.duplicated().any():
@@ -79,20 +83,80 @@ def _species_matrix(
     )
 
 
+def _cell_species_matrix(
+    occurrences: pd.DataFrame, species_list: list[str]
+) -> pd.DataFrame:
+    return _species_matrix(occurrences, GRID_COL, species_list)
+
+
+def _broadcast_cell_labels_to_pixels(
+    pixels: pd.DataFrame, cell_species: pd.DataFrame
+) -> pd.DataFrame:
+    """Attach cell-level 0/1 species vector to each raster pixel in that cell."""
+    cell_species = cell_species.copy()
+    cell_species.index = cell_species.index.astype(str)
+    pixels = pixels.copy()
+    pixels[GRID_COL] = pixels[GRID_COL].astype(str)
+
+    labels = cell_species.reindex(pixels[GRID_COL].values)
+    labels.index = pixels[PIXEL_ID_COL].values
+    labels.index.name = "site_id"
+    return labels
+
+
+def _save_pa_pixel_products(
+    pixels: pd.DataFrame,
+    occurrences: pd.DataFrame,
+    cls: str,
+    species_list: list[str],
+    covar_cols: list[str],
+) -> tuple[int, int]:
+    """
+    One row per ~100 m pixel; species labels from 1×1 km cell (same for all
+    pixels in the cell). Predict per pixel, aggregate to cell after predict.
+    """
+    pixels = pixels[pixels["class"] == cls].copy()
+    if pixels.empty:
+        print(f"No pixel rows for class {cls}")
+        return 0, 0
+
+    occ = occurrences[occurrences["class"] == cls]
+    cell_species = _cell_species_matrix(occ, species_list)
+    species_matrix = _broadcast_cell_labels_to_pixels(pixels, cell_species)
+    species_matrix.to_csv(species_matrix_path(cls, grouped=False))
+
+    cov = pixels.set_index(PIXEL_ID_COL)[covar_cols].copy()
+    cov.index.name = "site_id"
+    cov[GRID_COL] = pixels.set_index(PIXEL_ID_COL)[GRID_COL]
+    cov.to_csv(covariates_path(cls, grouped=False))
+
+    pd.DataFrame(
+        {GRID_COL: pixels[GRID_COL].astype(str).unique()}
+    ).to_csv(grid_cells_path(cls, grouped=False), index=False)
+
+    n_pixels = len(species_matrix)
+    n_cells = pixels[GRID_COL].nunique()
+    print(
+        f"\n[{cls}]  PIXEL  {n_pixels:,} pixels ({n_cells} cells) × "
+        f"{species_matrix.shape[1]} species  |  {len(occ):,} occurrence rows"
+    )
+    return n_cells, n_pixels
+
+
 def _save_grid_products(
     subset: pd.DataFrame,
     cls: str,
     species_list: list[str],
-    bioclim_cols: list[str],
+    covar_cols: list[str],
     suffix: str = "",
 ) -> tuple[int, int]:
-    """One row per grid cell; suffix '' or '_grouped'."""
+    """One row per grid cell (PO grouped mode)."""
     grid_id = GRID_COL
     species_matrix = _species_matrix(subset, grid_id, species_list)
     species_matrix.index.name = "site_id"
     species_matrix.to_csv(species_matrix_path(cls, grouped=bool(suffix)))
 
-    cov = subset.groupby(grid_id)[bioclim_cols].mean()
+    cov = subset.groupby(grid_id)[covar_cols].mean()
     cov.index.name = "site_id"
     cov.to_csv(covariates_path(cls, grouped=bool(suffix)))
 
@@ -113,14 +177,13 @@ def _save_point_products(
     subset: pd.DataFrame,
     cls: str,
     species_list: list[str],
-    bioclim_cols: list[str],
+    covar_cols: list[str],
 ) -> None:
-    """Point-level files (no suffix) + grouped grid aggregate for PO."""
     subset = _point_site_id(subset)
     species_matrix = _species_matrix(subset, "site_id", species_list)
     species_matrix.to_csv(species_matrix_path(cls, grouped=False))
 
-    cov = subset.groupby("site_id")[bioclim_cols].first()
+    cov = subset.groupby("site_id")[covar_cols].first()
     cov[GRID_COL] = subset.groupby("site_id")[GRID_COL].first()
     cov.to_csv(covariates_path(cls, grouped=False))
 
@@ -133,23 +196,39 @@ def _save_point_products(
         f"{species_matrix.shape[1]} species  |  {len(subset):,} obs"
     )
     _save_grid_products(
-        subset, cls, species_list, bioclim_cols, suffix=GROUPED_SUFFIX
+        subset, cls, species_list, covar_cols, suffix=GROUPED_SUFFIX
     )
 
 
 def main():
     df_raw = pd.read_csv(EXTRACTED_CSV)
-    df = df_raw[df_raw["slope"].notna()].copy()
-    print("rows dropped (slope NA):", df_raw.shape[0] - df.shape[0])
+    covar_cols = [c for c in COVARS_LIST if c in df_raw.columns]
+    missing_covars = [c for c in ("lon", "lat") if c not in covar_cols]
+    if missing_covars:
+        raise ValueError(f"extracted_data.csv missing spatial columns: {missing_covars}")
 
-    print(f"Assigning {GRID_COL} from Flora_net …")
-    df = assign_cod10_grid(df)
+    # Drop rows with any covariate NA (slope + CORINE gaps) so StandardScaler stays finite.
+    df = df_raw.dropna(subset=covar_cols).copy()
+    print(f"rows dropped (covariate NA): {df_raw.shape[0] - df.shape[0]}")
 
-    bioclim_cols = [c for c in COVARS_LIST if c in df.columns]
+    pa_pixels = df[df.get("extract_mode", "") == "cell_pixel"].copy()
+    po_rows = df[df.get("extract_mode", "") != "cell_pixel"].copy()
+
+    if not po_rows.empty:
+        print(f"Assigning {GRID_COL} to PO rows from Flora_net …")
+        po_rows = assign_cod10_grid(po_rows)
+
+    if not os.path.isfile(PA_OCCURRENCES_CSV):
+        raise FileNotFoundError(
+            f"Missing {PA_OCCURRENCES_CSV}. Re-run extract_raster_data.py."
+        )
+    pa_occ = pd.read_csv(PA_OCCURRENCES_CSV)
+    pa_occ[GRID_COL] = pa_occ[GRID_COL].astype(str)
+
     os.makedirs("data/processed", exist_ok=True)
 
-    pac = df[df["class"] == "PAC"]
-    grids_per_sp = pac.groupby("scientificName")[GRID_COL].nunique()
+    pac_occ = pa_occ[pa_occ["class"] == "PAC"]
+    grids_per_sp = pac_occ.groupby("scientificName")[GRID_COL].nunique()
     species_list = grids_per_sp[
         grids_per_sp >= MIN_SPECIES_LIST_PAC_GRIDS
     ].index.tolist()
@@ -158,15 +237,20 @@ def main():
         f"(PAC ≥{MIN_SPECIES_LIST_PAC_GRIDS} cells)"
     )
 
-    for cls in PA_CLASSES + PO_CLASSES:
-        subset = df[df["class"] == cls].copy()
+    for cls in PA_CLASSES:
+        if pa_pixels.empty:
+            print(f"No PA pixel data for {cls}")
+            continue
+        _save_pa_pixel_products(
+            pa_pixels, pa_occ, cls, species_list, covar_cols
+        )
+
+    for cls in PO_CLASSES:
+        subset = po_rows[po_rows["class"] == cls].copy()
         if subset.empty:
             print(f"No data for class {cls}")
             continue
-        if cls in PA_CLASSES:
-            _save_grid_products(subset, cls, species_list, bioclim_cols)
-        else:
-            _save_point_products(subset, cls, species_list, bioclim_cols)
+        _save_point_products(subset, cls, species_list, covar_cols)
 
 
 if __name__ == "__main__":
