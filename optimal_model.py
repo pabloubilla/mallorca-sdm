@@ -28,8 +28,10 @@ from run_model import (
 
 TRAIN_SOURCES = ["PAU", "POV", "POU"]
 FRACTIONS = (0.0, 0.5, 1.0)
-OUTPUT_CSV = Path("output/optimal_model_auc.csv")
-OUTPUT_PNG = Path("output/optimal_model_auc.png")
+# Grouped PO = fair cell-grain mix with PAU (plan Beyond PO/PA).
+GROUPED = True
+OUTPUT_CSV = Path("output/curated/optimal_model_auc_grouped.csv")
+OUTPUT_PNG = Path("output/curated/optimal_model_auc_grouped.png")
 SEED = 42
 NUM_EPOCHS = 5
 
@@ -58,7 +60,7 @@ def _build_training_mix(
         frac = pcts[src]
         if frac <= 0:
             continue
-        x, y, _ = _load_source_subset(src, n_grids=None, seed=seed, grouped=False)
+        x, y, _ = _load_source_subset(src, n_grids=None, seed=seed, grouped=GROUPED)
         x, y = _subsample(x, y, frac, seed=seed + i)
         if len(x) == 0:
             continue
@@ -187,7 +189,7 @@ def _run_lonlat_baselines(species_cols: pd.Index) -> list[dict]:
             src,
             size_train=None,
             seed=SEED,
-            grouped=False,
+            grouped=GROUPED,
             feature_cols=feature_cols,
             species_cols=species_cols,
             num_epochs=NUM_EPOCHS,
@@ -298,7 +300,7 @@ def main(plot_only: bool = False):
     # Species shared across sources (intersection after full load)
     cols = None
     for src in TRAIN_SOURCES:
-        _, y, _ = _load_source_subset(src, None, seed=SEED, grouped=False)
+        _, y, _ = _load_source_subset(src, None, seed=SEED, grouped=GROUPED)
         cols = y.columns if cols is None else cols.intersection(y.columns)
     species_cols = pd.Index(cols)
     print(f"Training species (intersection): {len(species_cols)}")

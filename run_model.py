@@ -146,6 +146,7 @@ def _load_source_subset(
 
     y = pd.read_csv(species_matrix_path(source, grouped), index_col="site_id")
     x = pd.read_csv(covariates_path(source, grouped), index_col="site_id")
+    y = y.fillna(0).clip(upper=1)
     bioclim_cols = _select_feature_cols(x, feature_cols)
     common = y.index.intersection(x.index)
     y, x = y.loc[common], x.loc[common]
@@ -179,6 +180,20 @@ def _load_source_subset(
         x = x.loc[y.index, bioclim_cols]
         meta["n_points"] = len(y)
     else:
+        # Fair cell-grain: collapse PA pixels → one row per UTMCODE1X1 when grouped.
+        if (
+            grouped
+            and not is_po_source(source)
+            and GRID_COL in x.columns
+        ):
+            g = x[GRID_COL].astype(str)
+            y = y.groupby(g).max().clip(upper=1)
+            x = x.groupby(g)[bioclim_cols].mean()
+            x.index.name = "site_id"
+            y.index.name = "site_id"
+            meta["unit"] = "grid"
+            print(f"  [{source}] aggregated PA pixels → {len(y)} cells (grouped)")
+
         pixel_mode = _is_pa_pixel_matrix(x, source, grouped)
         if pixel_mode:
             meta["unit"] = "pixel"
@@ -253,12 +268,9 @@ def _load_pac_eval(
     feature_cols: list[str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series | None]:
     """PAC eval matrix. Returns (X, Y, grid_per_row) for pixel→cell aggregation."""
-    y = pd.read_csv(
-        "data/processed/species_matrix_PAC.csv", index_col="site_id"
-    )
-    x = pd.read_csv(
-        "data/processed/covariates_PAC.csv", index_col="site_id"
-    )
+    y = pd.read_csv(species_matrix_path("PAC", grouped=False), index_col="site_id")
+    x = pd.read_csv(covariates_path("PAC", grouped=False), index_col="site_id")
+    y = y.fillna(0).clip(upper=1)
     common = y.index.intersection(x.index)
     y, x = y.loc[common], x.loc[common]
     grids = x[GRID_COL] if GRID_COL in x.columns else None

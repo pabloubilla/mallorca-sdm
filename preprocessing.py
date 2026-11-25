@@ -1,4 +1,5 @@
 """Processed matrices: PA by raster pixel; PO by point + grid-mean grouped (_grouped)."""
+import argparse
 import os
 
 import geopandas as gpd
@@ -10,6 +11,10 @@ from covariables import COVARS_LIST
 FLORA_NET_PATH = "data/raw/Flora_net.gpkg"
 EXTRACTED_CSV = "data/raw/extracted_data.csv"
 PA_OCCURRENCES_CSV = "data/raw/pa_occurrences.csv"
+CURATED_EXTRACTED_CSV = "data/raw/curated/extracted_data.csv"
+CURATED_PA_OCCURRENCES_CSV = "data/raw/curated/pa_occurrences.csv"
+# Override with env MALLORCA_PROCESSED_DIR (e.g. data/processed/curated).
+PROCESSED_DIR = os.environ.get("MALLORCA_PROCESSED_DIR", "data/processed")
 GRID_COL = "UTMCODE1X1"
 GROUPED_SUFFIX = "_grouped"
 PIXEL_ID_COL = "pixel_id"
@@ -22,6 +27,27 @@ MIN_TRAIN_OCC_GRID = 1
 MIN_TRAIN_OCC_POINT = 2
 
 
+def set_processed_dir(path: str) -> None:
+    global PROCESSED_DIR
+    PROCESSED_DIR = path
+    os.environ["MALLORCA_PROCESSED_DIR"] = path
+
+
+def resolve_table_path(path: str) -> str:
+    """Return existing CSV path; prefer plain file, else ``.csv.gz``."""
+    if os.path.isfile(path):
+        return path
+    if path.endswith(".gz"):
+        bare = path[:-3]
+        if os.path.isfile(bare):
+            return bare
+        raise FileNotFoundError(path)
+    gz = f"{path}.gz"
+    if os.path.isfile(gz):
+        return gz
+    raise FileNotFoundError(f"{path} (or {gz})")
+
+
 def file_suffix(source: str, grouped: bool = False) -> str:
     if grouped and is_po_source(source):
         return GROUPED_SUFFIX
@@ -29,15 +55,21 @@ def file_suffix(source: str, grouped: bool = False) -> str:
 
 
 def species_matrix_path(source: str, grouped: bool = False) -> str:
-    return f"data/processed/species_matrix_{source}{file_suffix(source, grouped)}.csv"
+    return os.path.join(
+        PROCESSED_DIR, f"species_matrix_{source}{file_suffix(source, grouped)}.csv"
+    )
 
 
 def covariates_path(source: str, grouped: bool = False) -> str:
-    return f"data/processed/covariates_{source}{file_suffix(source, grouped)}.csv"
+    return os.path.join(
+        PROCESSED_DIR, f"covariates_{source}{file_suffix(source, grouped)}.csv"
+    )
 
 
 def grid_cells_path(source: str, grouped: bool = False) -> str:
-    return f"data/processed/grid_cells_{source}{file_suffix(source, grouped)}.csv"
+    return os.path.join(
+        PROCESSED_DIR, f"grid_cells_{source}{file_suffix(source, grouped)}.csv"
+    )
 
 
 def is_po_source(source: str) -> bool:
@@ -78,8 +110,9 @@ def _species_matrix(
         .size()
         .unstack(fill_value=0)
         .clip(upper=1)
-        .astype(np.int8)
         .reindex(columns=species_list, fill_value=0)
+        .fillna(0)
+        .astype(np.int8)
     )
 
 
@@ -200,8 +233,20 @@ def _save_point_products(
     )
 
 
-def main():
-    df_raw = pd.read_csv(EXTRACTED_CSV)
+def main(
+    extracted_csv: str = EXTRACTED_CSV,
+    pa_occurrences_csv: str = PA_OCCURRENCES_CSV,
+    processed_dir: str | None = None,
+) -> None:
+    if processed_dir:
+        set_processed_dir(processed_dir)
+    extracted_csv = resolve_table_path(extracted_csv)
+    pa_occurrences_csv = resolve_table_path(pa_occurrences_csv)
+    print(f"processed_dir={PROCESSED_DIR}")
+    print(f"extracted={extracted_csv}")
+    print(f"pa_occurrences={pa_occurrences_csv}")
+
+    df_raw = pd.read_csv(extracted_csv, low_memory=False)
     covar_cols = [c for c in COVARS_LIST if c in df_raw.columns]
     missing_covars = [c for c in ("lon", "lat") if c not in covar_cols]
     if missing_covars:
@@ -218,14 +263,15 @@ def main():
         print(f"Assigning {GRID_COL} to PO rows from Flora_net …")
         po_rows = assign_cod10_grid(po_rows)
 
-    if not os.path.isfile(PA_OCCURRENCES_CSV):
+    if not os.path.isfile(pa_occurrences_csv):
         raise FileNotFoundError(
-            f"Missing {PA_OCCURRENCES_CSV}. Re-run extract_raster_data.py."
+            f"Missing {pa_occurrences_csv}. Re-run extract_raster_data.py "
+            "or apply_curated_taxon_filter.py."
         )
-    pa_occ = pd.read_csv(PA_OCCURRENCES_CSV)
+    pa_occ = pd.read_csv(pa_occurrences_csv)
     pa_occ[GRID_COL] = pa_occ[GRID_COL].astype(str)
 
-    os.makedirs("data/processed", exist_ok=True)
+    os.makedirs(PROCESSED_DIR, exist_ok=True)
 
     pac_occ = pa_occ[pa_occ["class"] == "PAC"]
     grids_per_sp = pac_occ.groupby("scientificName")[GRID_COL].nunique()
@@ -254,4 +300,33 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    p = argparse.ArgumentParser(description="Build processed SDM matrices.")
+    p.add_argument(
+        "--extracted",
+        default=EXTRACTED_CSV,
+        help="Path to extracted_data.csv",
+    )
+    p.add_argument(
+        "--pa-occurrences",
+        default=PA_OCCURRENCES_CSV,
+        help="Path to pa_occurrences.csv",
+    )
+    p.add_argument(
+        "--processed-dir",
+        default=None,
+        help="Output dir (default: data/processed or MALLORCA_PROCESSED_DIR)",
+    )
+    p.add_argument(
+        "--curated",
+        action="store_true",
+        help="Use data/raw/curated inputs and write data/processed/curated",
+    )
+    args = p.parse_args()
+    extracted = args.extracted
+    pa_occ = args.pa_occurrences
+    out_dir = args.processed_dir
+    if args.curated:
+        extracted = CURATED_EXTRACTED_CSV
+        pa_occ = CURATED_PA_OCCURRENCES_CSV
+        out_dir = out_dir or "data/processed/curated"
+    main(extracted_csv=extracted, pa_occurrences_csv=pa_occ, processed_dir=out_dir)

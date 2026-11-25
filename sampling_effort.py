@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from plot_style import apply as apply_plot_style
-from preprocessing import grid_cells_path, species_matrix_path
+from preprocessing import GRID_COL, covariates_path, grid_cells_path, species_matrix_path
 from run_model import MIN_TRAIN_SITES, run_model
 
 SIZE_GRID = [1, 10, 100, 200, 500, 1000, 1600]
@@ -49,10 +49,23 @@ PLOT_ROWS = [
 
 def _output_paths(eval_species_mode: str) -> tuple[Path, Path]:
     suffix = "" if eval_species_mode == "all" else f"_{eval_species_mode}"
+    out = Path("output/curated")
     return (
-        Path(f"output/sampling_effort_auc{suffix}.csv"),
-        Path(f"output/sampling_effort_auc_by_prevalence{suffix}.png"),
+        out / f"sampling_effort_auc{suffix}.csv",
+        out / f"sampling_effort_auc_by_prevalence{suffix}.png",
     )
+
+
+def _pac_cell_prevalence() -> tuple[pd.Series, int]:
+    """Prevalence = % of PAC 1×1 km cells (not raster pixels)."""
+    y = pd.read_csv(species_matrix_path(EVAL_SOURCE, grouped=False), index_col="site_id")
+    cov = pd.read_csv(covariates_path(EVAL_SOURCE, grouped=False), index_col="site_id")
+    if GRID_COL in cov.columns:
+        cell = y.groupby(cov[GRID_COL].astype(str)).max()
+    else:
+        cell = y
+    n = len(cell)
+    return cell.sum(axis=0) / n * 100.0, n
 
 
 def resolve_eval_species(eval_species_mode: str) -> pd.Index | None:
@@ -146,11 +159,7 @@ def sampling_effort_per_source(
 
     eval_species = resolve_eval_species(eval_species_mode)
 
-    y_pac = pd.read_csv(
-        f"data/processed/species_matrix_{EVAL_SOURCE}.csv", index_col="site_id"
-    )
-    n_pac_grids = len(y_pac)
-    prevalence_pct = y_pac.sum(axis=0) / n_pac_grids * 100.0
+    prevalence_pct, n_pac_grids = _pac_cell_prevalence()
     bin_species = {
         bid: (
             prevalence_pct.index[fn(prevalence_pct.values)]

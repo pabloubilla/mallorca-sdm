@@ -129,6 +129,8 @@ select(SP,presence)%>%
 rename(scientificName=SP)%>%
 mutate(
   source = "Saez",
+  datasetKey = "Saez",
+  recordedBy = "Saez",
   coordinateUncertaintyInMeters = UNC_500M
 )
 # Nombre de geometría → geom
@@ -168,7 +170,7 @@ nrow(GBIF_data_clean)
 GBIF_data_def=GBIF_data_clean%>%
   filter(coordinateUncertaintyInMeters!=707)%>%
   filter(collectionCode!="FV-MALLORCA")%>%
-  select(eventDate,scientificName,coordinateUncertaintyInMeters)
+  select(eventDate,scientificName,coordinateUncertaintyInMeters,datasetKey,recordedBy)
 
 nrow(GBIF_data_def)
 
@@ -274,6 +276,8 @@ Biel_flora_xy <- Biel_flora_xy %>%
     coordinateUncertaintyInMeters = if_else(grid_m == 500, UNC_500M, UNC_1KM),
     class = if_else(UTMCODE1X1 %in% Biel_pac_codes, "PAC", "PAU"),
     source = "Biel",
+    datasetKey = "Biel",
+    recordedBy = "Biel",
     scientificName = Especie,
     eventDate = as.POSIXct(Data, tz = "UTC")
   )
@@ -291,15 +295,18 @@ st_geometry(Biel_flora_sf) <- "geom"
 Biel_flora_sf <- Biel_flora_sf %>%
   select(
     eventDate, scientificName, geom, source, class,
-    coordinateUncertaintyInMeters, UTMCODE1X1, grid_m, quad_500
+    coordinateUncertaintyInMeters, datasetKey, recordedBy,
+    UTMCODE1X1, grid_m, quad_500
   )
 
 Biel_PAC <- Biel_flora_sf %>%
   filter(class == "PAC") %>%
-  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters)
+  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 Biel_PAU <- Biel_flora_sf %>%
   filter(class == "PAU") %>%
-  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters)
+  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 
 message(
   "Biel Mallorca: PAC=", nrow(Biel_PAC),
@@ -324,11 +331,13 @@ potential_flora_data_bind <- potential_flora_data %>%
     source = "GBIF",
     coordinateUncertaintyInMeters = UNC_1KM
   ) %>%
-  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters)
+  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 
 Saez_data_sf_bind <- Saez_data_sf %>%
   mutate(eventDate = as.POSIXct(NA)) %>%
-  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters)
+  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 
 full_flora_data <- bind_rows(potential_flora_data_bind, Saez_data_sf_bind)
 str(full_flora_data)
@@ -339,7 +348,8 @@ table(full_flora_data$source, useNA = "ifany")
 
 Flora_data <- st_join(full_flora_data, Flora_net) %>%
   filter(Flora == 1) %>%
-  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters)
+  select(eventDate, scientificName, geom, source, coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 
 #st_write(Flora_data,"Flora_data_raw.gpkg",append=FALSE)
 
@@ -354,7 +364,8 @@ Not_finished_flora_data_raw=st_join(
   Flora_net
 )%>%
   filter(is.na(Flora))%>%
-  select(eventDate,scientificName,geom,source,coordinateUncertaintyInMeters)
+  select(eventDate,scientificName,geom,source,coordinateUncertaintyInMeters,
+         datasetKey, recordedBy)
 
 # if we stop here, some ED50 data and other points can be included as PAU, 
 
@@ -429,7 +440,8 @@ sapply(matches, nrow)
 # Esquema común: class (PAC/PAU/POV/POU) + source + incertidumbre (semidiagonal de celda)
 MERGE_COLS <- c(
   "eventDate", "scientificName", "geom",
-  "class", "coordinateUncertaintyInMeters", "source"
+  "class", "coordinateUncertaintyInMeters", "source",
+  "datasetKey", "recordedBy"
 )
 
 Flora_data <- Flora_data %>%
@@ -443,7 +455,12 @@ Not_finished_flora_data_raw <- Not_finished_flora_data_raw %>%
   select(all_of(MERGE_COLS))
 
 Biodibal_data <- Biodibal_data %>%
-  mutate(class = "POV", source = "Biodibal") %>%
+  mutate(
+    class = "POV",
+    source = "Biodibal",
+    datasetKey = "Biodibal",
+    recordedBy = "Biodibal"
+  ) %>%
   select(all_of(MERGE_COLS))
 
 GBIF_data_def <- GBIF_data_def %>%

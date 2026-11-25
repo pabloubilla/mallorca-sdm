@@ -1,0 +1,22 @@
+keep_taxa=1545
+gpkg_obs_before=305154
+gpkg_obs_after=301242
+gpkg_spp_before=2069
+gpkg_spp_after=1543
+
+gpkg_by_class_before:
+class  n_obs  n_spp
+  PAC  75394   1361
+  PAU  73307   1429
+  POU  66143   1542
+  POV  90310   1357
+
+gpkg_by_class_after:
+class  n_obs  n_spp
+  PAC  74403   1259
+  PAU  72292   1294
+  POU  64895   1184
+  POV  89652   1257
+
+pa_occurrences: 148,652→146,646 rows; spp 1583→1401
+extracted_data: 318,997→317,091 rows

@@ -1,159 +1,149 @@
 # Mallorca SDM
 
-Benchmark de **modelos de distribución de especies profundos** (Deep SDM) con observaciones de plantas terrestres en Mallorca, integrando varias fuentes de datos y evaluando transferencia entre tipos de muestreo.
+Deep species distribution models (Deep SDM) for terrestrial plants in Mallorca.
+Benchmark: train on incomplete / presence-only sources, evaluate transfer on complete presence–absence grids (**PAC**).
 
-## Fuentes y clases de observación
+Collaborators who want to work on **modeling methodology** can start from the curated share pack below (no rasters required).
 
-| Clase   | Significado                                    | Origen (aprox.)                    | Unidad en el modelo |
-| ------- | ---------------------------------------------- | ---------------------------------- | ------------------- |
-| **PAC** | Presencia–ausencia completa                    | Flora GBIF 707 m + Sáez/Puig Major + Biel GBO (celdas en cuadrículas) | Celda (1 km o 500 m) → centroide + incertidumbre |
-| **PAU** | Presencia–ausencia incompleta                  | Flora incompleta + Biel GBO fuera de cuadrículas PAC | Idem |
-| **POV** | Presencia validada (puntos GPS)                | Biodibal                           | Punto (`lon`/`lat`) |
-| **POU** | Presencia no validada (puntos GPS)             | GBIF                               | Punto (`lon`/`lat`) |
+## Observation classes
 
-`PAC` / `PAU` = **calidad de muestreo**, no tamaño de celda. PA se representa como **centroide + `coordinateUncertaintyInMeters`** (semidiagonal: ~707 m a 1 km; ~354 m a 500 m). Columna **`source`**: `GBIF`, `Saez`, `Biel`, `Biodibal`.
+| Class | Meaning | Typical origin | Model unit |
+| ----- | ------- | -------------- | ---------- |
+| **PAC** | Presence–absence, complete sampling | Flora + Sáez/Puig Major + Biel GBO (mapped cells) | Cell → centroid + uncertainty |
+| **PAU** | Presence–absence, incomplete | Incomplete flora + Biel outside PAC cells | Same |
+| **POV** | Validated presence (GPS) | Biodibal | Point (`lon`/`lat`) |
+| **POU** | Unvalidated presence (GPS) | GBIF | Point (`lon`/`lat`) |
 
-Biel: `data/raw/Biel/20260823_FLORA_GBO_Reduida.xlsx` (solo Mallorca) + cuadrículas `20260620_Quadrícules_GBO.xlsx` (qué celdas son PAC). Letras A–D en UTM = grano 500 m.
+`PAC` / `PAU` = **sampling quality**, not cell size. Column `source` ∈ {`GBIF`, `Saez`, `Biel`, `Biodibal`}.
 
-Los nombres científicos se unifican contra el backbone de GBIF en `data_preparation.R`.
+### Curated taxon filter
 
-## Entorno Python
+Shared data keep taxa that are in the **official Mallorca flora** *or* the **official allochthonous list** (`en_clave_o_aloctonas == SI`). Everything else is dropped as nomenclature / geography noise.
+
+- Keep list: `data/raw/curated_taxon_keep.csv`
+- Filter script: `scripts/apply_curated_taxon_filter.py`
+- Review workbook (local / not in git): `data/raw/dataset_clave_aloctonas_review.xlsx`
+
+## Quickstart (modeling on curated data)
+
+### 1. Environment
 
 ```bash
+git clone https://github.com/pabloubilla/mallorca-sdm.git
 cd mallorca-sdm
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install torch scikit-learn matplotlib SciencePlots   # modelado, curvas, estilo nature
+pip install torch scikit-learn matplotlib SciencePlots
 ```
 
-Figuras (`sampling_effort.py`, `map_grid_density_source.py`): estilo [SciencePlots nature](https://github.com/garrettj403/SciencePlots) vía `plot_style.py` (`science` + `nature` + `no-latex`).
+### 2. Curated inputs (in git)
 
-Usa siempre el `pip` del venv (`which pip` → `.venv/bin/pip`). Dependencias base en `requirements.txt`.
+| Path | Role |
+| ---- | ---- |
+| `data/raw/curated/extracted_data.csv.gz` | Raster pixels / GPS points + covariates |
+| `data/raw/curated/pa_occurrences.csv` | PA labels (species × 1 km cell) |
+| `data/raw/curated/filter_log.txt` | Filter counts |
+| `data/raw/curated_taxon_keep.csv` | Taxa kept |
+| `data/raw/Flora_net.gpkg` | 1 km grid (`COD10X10` for PO) |
 
-## Estructura del flujo de trabajo
-
-Ejecutar los pasos **en este orden** (cada uno depende del anterior):
-
-```
-1. data_preparation.R       → data/raw/full_data_saez.gpkg
-2. extract_raster_data.py   → data/raw/extracted_data.csv (+ .gpkg)
-3. preprocessing.py         → data/processed/ (matrices y covariables)
-4. run_model.py             → output/best_model_*.pt, output/auc_per_species_*.csv
-5. sampling_effort.py       → curvas esfuerzo de muestreo (opcional)
-```
-
-### 1. `data_preparation.R` (R)
-
-Carga Biodibal, GBIF, Flora/Sáez, Biel; filtra y fusiona geometrías; asigna `class`; resuelve taxonomía con **rgbif** (`name_backbone` / revisión manual en `taxonkey_list_review.xlsx`). Salida principal: `data/raw/full_data_saez.gpkg` (ocurrencias, sin covariables). Alternativa Python: `rebuild_full_data_saez.py`.
-
-### 2. `extract_raster_data.py` (Python)
-
-Muestrea covariables raster (`.tif`) del GPKG. Configurar rutas en `RASTER_FOLDERS`.
-
-| Clase | Extract |
-|-------|---------|
-| **PAC / PAU** | **Una fila por píxel raster (~100 m)** dentro de cada celda 1×1 km; sin agregar covariables (predecir por píxel → agregar después) |
-| **POV / POU** | Muestreo en el punto GPS; deduplica geometrías y reexpande |
-
-Backups: `extracted_rasters_pa_pixels.csv`, `pa_occurrences.csv`, `extracted_rasters_po_points.csv`. Salida: `data/raw/extracted_data.csv` (+ `.gpkg`, `extract_mode`: `cell_pixel` | `point`).
-
-### 3. `preprocessing.py` (Python)
-
-- Join espacial a `data/raw/Flora_net.gpkg` → columna `COD10X10`.
-- **PAC / PAU:** `species_matrix_{cls}.csv` — una fila por **píxel raster** (~100 m); etiquetas de especie a nivel de celda `UTMCODE1X1` (broadcast). AUC en PAC: media de predicciones píxel → celda.
-- **POV / POU (punto):** mismos nombres sin sufijo — fila por GPS; bioclim en el punto.
-- **POV / POU (grouped):** `species_matrix_{cls}_grouped.csv` — media bioclim y presencias por celda (como PA).
-- `grid_cells_{cls}.csv` y `grid_cells_{cls}_grouped.csv` para el muestreo por celdas.
-
-**Catálogo de especies:** presentes en ≥3 celdas PAC (`MIN_SPECIES_LIST_PAC_GRIDS`).
-
-**Umbrales al entrenar** (`run_model.py`, sobre el dataset completo de la fuente):
-
-| Fuente | Mínimo para incluir especie |
-|--------|----------------------------|
-| PAU    | ≥10 celdas con presencia   |
-| POV/POU (punto) | ≥10 puntos con presencia |
-| POV/POU (`_grouped`) | ≥10 celdas con presencia |
-
-**Evaluación en PAC:** especies con ≥3 celdas PAC (catálogo).
-
-Filas con `slope` NA se descartan. Listas de variables en `covariables.py`. Salida en `data/processed/`.
-
-### 4. `run_model.py` (Python)
-
-Entrena un MLP en una fuente y evalúa AUC por especie en **PAC** (cuadrículas).
-
-| Fuente | Pérdida              | Datos de entrenamiento |
-|--------|----------------------|-------------------------|
-| PAU    | `BalancedBCELoss`    | Subconjunto de **celdas** |
-| POV/POU | `DeepMaxEntLoss`   | Puntos dentro de celdas muestreadas, o celdas si `grouped=True` |
-
-`size_train` = celdas muestreadas. `grouped=True` usa ficheros `_grouped` (PO alineado con PA).
+Species **matrices are not shipped**. Build them locally:
 
 ```bash
-python run_model.py
-python -c "from run_model import run_model; run_model('POV', size_train=10)"
-python -c "from run_model import run_model; run_model('POV', size_train=10, grouped=True)"
+python preprocessing.py --curated
+# → data/processed/curated/{species_matrix,covariates,grid_cells}_*.csv
 ```
 
-### 5. `sampling_effort.py` (Python, opcional)
+`preprocessing.py` accepts `.csv` or `.csv.gz` for the extracted table.
 
-Compara **PAU, POU y POV** en modo **point** y **grouped** (PO agregado a celda). Figura **3×3**:
+### 3. Train / evaluate
 
-| Fila | Contenido |
-|------|-----------|
-| 1 | AUC vs `n_grids` (modo point) |
-| 2 | AUC vs `n_train_rows` (modo point) |
-| 3 | AUC vs `n_grids` (modo grouped; filas ≈ celdas también en PO) |
+```bash
+export MALLORCA_PROCESSED_DIR=data/processed/curated
 
-Columnas: bins de prevalencia (% celdas PAC). CSV incluye columna `data_mode`.
+python -c "from run_model import run_model; run_model('PAU', size_train=10)"
+python -c "from run_model import run_model; run_model('POV', size_train=10, grouped=True)"
 
-**Bins de prevalencia en PAC** (para estratificar la AUC):
+python sampling_effort.py
+python optimal_model.py
+```
 
-| Bin    | Criterio (% de celdas PAC) |
-|--------|----------------------------|
-| rare   | &lt; 5%                    |
-| medium | 5% – 30%                   |
-| common | &gt; 30%                   |
+Canonical fair mixes use **cell grain** (`grouped=True` for PO; PA pixels aggregated to `UTMCODE1X1` for AUC). Outputs default under `output/` (gitignored); curated analysis scripts often write `output/curated/`.
 
-#### Conjunto de especies para la evaluación
+| Source | Loss | Training rows |
+| ------ | ---- | ------------- |
+| PAU | `BalancedBCELoss` | Sampled cells (pixel rows inside cells) |
+| POV / POU | `DeepMaxEntLoss` | Points in sampled cells, or cells if `grouped=True` |
 
-| Modo | Descripción |
-|------|-------------|
-| `all` | Sin filtro extra (por defecto). |
-| `intersection_pac_pov_pou` | Solo especies con ≥1 presencia en PAC, POV y POU (unidades naturales de cada matriz). |
+Evaluation: AUC per species on **PAC**.
+
+## Full pipeline (optional — needs local raw + rasters)
+
+Raw GBIF/Biodibal/Biel stacks and rasters are **not** in git (`data/` ignored except the curated pack above).
+
+```
+1. data_preparation.R / rebuild_full_data_saez.py  → data/raw/full_data_saez.gpkg
+2. scripts/apply_curated_taxon_filter.py           → data/raw/curated/ + *_curated.gpkg
+3. extract_raster_data.py                         → extracted_data (+ curated reuse)
+4. preprocessing.py [--curated]                   → data/processed/[curated/]
+5. run_model.py / sampling_effort.py / optimal_model.py
+```
+
+### Preprocessing notes
+
+- Join to `Flora_net.gpkg` → `COD10X10` on PO.
+- **PAC / PAU:** one row per ~100 m raster pixel; species labels at cell `UTMCODE1X1`.
+- **POV / POU:** point matrices; optional `*_grouped.csv` (cell mean).
+- Species catalog: PAC ≥ `MIN_SPECIES_LIST_PAC_GRIDS` cells (curated default = 1).
+- Drop rows with covariate NA (e.g. `slope`). Columns in `covariables.py`.
+
+### Sampling effort (optional)
 
 ```bash
 python sampling_effort.py
 python sampling_effort.py --eval-species intersection_pac_pov_pou
 ```
 
-```bash
-python intersection_POV_POU_PAC.py   # listar tamaño de la intersección
-```
+Prevalence bins on PAC: rare &lt;5%, medium 5–30%, common &gt;30%.
 
-Salidas: `output/sampling_effort_auc.csv`, `output/sampling_effort_auc_by_prevalence.png` (sufijo `_intersection_pac_pov_pou` si aplica).
+## Requirements
 
-## Análisis y utilidades
+- **Python 3.12+:** see `requirements.txt`; plus `torch`, `scikit-learn`, `matplotlib` for modeling
+- **R** (full prep only): `sf`, `tidyverse`, `rgbif`, …
 
-| Archivo | Uso |
-|---------|-----|
-| `EDA_data.ipynb` | Exploración de datos |
-| `analyse_data.R` | Mapas y resúmenes espaciales |
-| `intersection_POV_POU_PAC.py` | Especies en PAC ∩ POV ∩ POU |
-| `sampling_effort.py` | Curvas celdas de entrenamiento vs. AUC en PAC |
-| `covariables.py` | Lista de columnas bioclim |
+## Main scripts (light map)
 
-## Requisitos
+### Pipeline / modeling (repo root)
 
-- **R:** `sf`, `tidyverse`, `rgbif`, …
-- **Python 3.12+:** `geopandas`, `rasterio`, `pandas`, `numpy`, `torch`, `scikit-learn`, `matplotlib`
+| Script | Role |
+| ------ | ---- |
+| `data_preparation.R` / `rebuild_full_data_saez.py` | Build `full_data_saez.gpkg` from raw GBIF / Biel / Biodibal / Sáez |
+| `extract_raster_data.py` | Sample rasters → `extracted_data` (+ PA pixel rows) |
+| `preprocessing.py` | Build `species_matrix_*`, `covariates_*`, `grid_cells_*` |
+| `covariables.py` | Covariate column list |
+| `models.py` | MLP + `BalancedBCELoss` / `DeepMaxEntLoss` (+ phylo Laplace helper) |
+| `run_model.py` | Train one source → per-species AUC on PAC |
+| `sampling_effort.py` | Learning curves vs effort / prevalence bins |
+| `optimal_model.py` | Factorial PAU/POV/POU mixes → mean PAC AUC |
+| `plot_style.py` | SciencePlots nature style for figures |
+| `map_grid_density_source.py` | 1 km density maps by observation class |
 
-Los rasters y datos crudos (`data/raw/`) no están versionados en git; `output/` está en `.gitignore`.
+### Analysis / prep helpers (`scripts/`)
 
-## Nota sobre el experimento actual
+| Script | Role |
+| ------ | ---- |
+| `apply_curated_taxon_filter.py` | Keep flora ∪ allochthonous → curated GPKG + extract pack |
+| `build_dataset_clave_aloctonas_review.py` | Review workbook clave ↔ dataset ↔ allochthonous |
+| `extract_clave_vs_dataset.py` | Parse clave / match vs dataset names |
+| `analyze_rarity_by_source.py` | Rarity bins + PO “rarification” vs PAC |
+| `species_accumulation_mix.py` | Inventory accumulation under source mixes |
+| `analyze_taxonomy_by_source.py` | Family/order composition PAC/PAU/POV/POU |
+| `build_opentree_laplacian.py` | OpenTree TNRS + cophenetic Laplacian cache |
+| `run_phylo_laplace_ab.py` | Smoke: MLP ± phylo Laplace → PAC AUC |
+| `plot_illustrative_beyond_po_pa.py` | Illustrative manuscript figures |
 
-El benchmark de transferencia es **entrenar en PAU / POU / POV → evaluar en PAC** (cuadrícula Flora). El esfuerzo de muestreo se expresa en **celdas** comunes (`COD10X10`); PO conserva resolución a punto dentro de esas celdas. La intersección taxonómica (`intersection_pac_pov_pou`) es opcional para equilibrar qué especies entran en la media de AUC entre fuentes.
+Product docs: `product/` (vision, decisions, roadmap, current-state). Manuscript: `manuscript/mallorca-sdm-manuscript/` (canonical `main-2.tex`).
 
-Con el subconjunto espacial actual del extract hay pocas decenas de celdas con datos; al ampliar cobertura en Mallorca, los porcentajes de prevalencia y los valores de `SIZE_GRID` tendrán más rango.
+## Experiment note
+
+Transfer benchmark: train **PAU / POU / POV** → evaluate **PAC**. Sampling effort is measured in shared cells; PO can stay at point resolution inside those cells unless `grouped=True`.

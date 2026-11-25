@@ -29,6 +29,8 @@ MERGE_COLS = [
     "class",
     "coordinateUncertaintyInMeters",
     "source",
+    "datasetKey",
+    "recordedBy",
 ]
 FLORA_UTM_RE = re.compile(
     r"^31S\s+([A-Z]{2})\s+(\d+)\s+(\d+)(?:\s+([A-Da-d]))?$", re.I
@@ -100,6 +102,8 @@ def load_biodibal() -> gpd.GeoDataFrame:
     gdf["eventDate"] = normalize_event_date(gdf["eventDate"])
     gdf["source"] = "Biodibal"
     gdf["class"] = "POV"
+    gdf["datasetKey"] = "Biodibal"
+    gdf["recordedBy"] = "Biodibal"
     return gdf[MERGE_COLS]
 
 
@@ -125,6 +129,8 @@ def load_saez() -> gpd.GeoDataFrame:
             "coordinateUncertaintyInMeters": UNC_500M,
             "source": "Saez",
             "class": "PAC",
+            "datasetKey": "Saez",
+            "recordedBy": "Saez",
         },
         geometry=[Point(xy) for xy in zip(long["XCENTROIDE"], long["YCENTROIDE"])],
         crs=CRS,
@@ -140,13 +146,22 @@ def load_gbif_and_flora(utm_net: gpd.GeoDataFrame):
         gbif["coordinateUncertaintyInMeters"].notna()
         & (gbif["coordinateUncertaintyInMeters"] < 1000)
     ]
+    prov_cols = [
+        "eventDate",
+        "scientificName",
+        "geometry",
+        "source",
+        "coordinateUncertaintyInMeters",
+        "datasetKey",
+        "recordedBy",
+    ]
     potential = gbif[gbif["coordinateUncertaintyInMeters"] == 707].copy()
     potential["eventDate"] = normalize_event_date(potential["eventDate"])
     potential["source"] = "GBIF"
     potential["coordinateUncertaintyInMeters"] = UNC_1KM
-    potential_bind = potential[
-        ["eventDate", "scientificName", "geometry", "source", "coordinateUncertaintyInMeters"]
-    ]
+    potential["datasetKey"] = potential["datasetKey"].astype(str)
+    potential["recordedBy"] = potential["recordedBy"]
+    potential_bind = potential[prov_cols]
 
     gbif_def = gbif[
         (gbif["coordinateUncertaintyInMeters"] != 707)
@@ -155,23 +170,18 @@ def load_gbif_and_flora(utm_net: gpd.GeoDataFrame):
     gbif_def["eventDate"] = normalize_event_date(gbif_def["eventDate"])
     gbif_def["source"] = "GBIF"
     gbif_def["class"] = "POU"
-    gbif_po = gbif_def[
-        ["eventDate", "scientificName", "geometry", "class", "coordinateUncertaintyInMeters", "source"]
-    ]
+    gbif_def["datasetKey"] = gbif_def["datasetKey"].astype(str)
+    gbif_po = gbif_def[MERGE_COLS]
 
     saez = load_saez()
-    saez_bind = saez[
-        ["eventDate", "scientificName", "geometry", "source", "coordinateUncertaintyInMeters"]
-    ]
+    saez_bind = saez[prov_cols]
     full_flora = pd.concat([potential_bind, saez_bind], ignore_index=True)
     full_flora = gpd.GeoDataFrame(full_flora, geometry="geometry", crs=CRS)
 
     flora_net = utm_net[utm_net["Flora"] == 1][["Flora", "geometry"]].copy()
     joined = gpd.sjoin(full_flora, flora_net, how="left", predicate="intersects")
     joined = joined[~joined.index.duplicated(keep="first")]
-    flora_pac = joined[joined["Flora"] == 1][
-        ["eventDate", "scientificName", "geometry", "source", "coordinateUncertaintyInMeters"]
-    ].copy()
+    flora_pac = joined[joined["Flora"] == 1][prov_cols].copy()
     flora_pac["class"] = "PAC"
 
     flora_pau = gpd.sjoin(
@@ -181,9 +191,7 @@ def load_gbif_and_flora(utm_net: gpd.GeoDataFrame):
         predicate="intersects",
     )
     flora_pau = flora_pau[~flora_pau.index.duplicated(keep="first")]
-    flora_pau = flora_pau[flora_pau["Flora"].isna()][
-        ["eventDate", "scientificName", "geometry", "source", "coordinateUncertaintyInMeters"]
-    ].copy()
+    flora_pau = flora_pau[flora_pau["Flora"].isna()][prov_cols].copy()
     flora_pau["class"] = "PAU"
     return flora_pac[MERGE_COLS], flora_pau[MERGE_COLS], gbif_po[MERGE_COLS]
 
@@ -241,6 +249,8 @@ def load_biel(utm_net: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataF
         lambda c: "PAC" if c in pac_codes else "PAU"
     )
     flora_xy["source"] = "Biel"
+    flora_xy["datasetKey"] = "Biel"
+    flora_xy["recordedBy"] = "Biel"
     flora_xy["scientificName"] = flora_xy["Especie"]
     flora_xy["eventDate"] = pd.to_datetime(flora_xy["Data"], errors="coerce", utc=True)
 
@@ -252,6 +262,8 @@ def load_biel(utm_net: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataF
                 "class",
                 "coordinateUncertaintyInMeters",
                 "source",
+                "datasetKey",
+                "recordedBy",
             ]
         ],
         geometry=[
@@ -461,6 +473,8 @@ def main() -> None:
             "class",
             "coordinateUncertaintyInMeters",
             "source",
+            "datasetKey",
+            "recordedBy",
             "scientificName_original",
             "geometry",
         ]
@@ -473,7 +487,9 @@ def main() -> None:
     out.to_file(out_path, driver="GPKG")
     print(
         f"wrote {out_path} rows={len(out)} species={out['scientificName'].nunique()} "
-        f"sources={out['source'].value_counts().to_dict()}"
+        f"sources={out['source'].value_counts().to_dict()} "
+        f"datasetKey_na={out['datasetKey'].isna().sum()} "
+        f"recordedBy_na={out['recordedBy'].isna().sum()}"
     )
 
 

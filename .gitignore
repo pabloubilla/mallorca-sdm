@@ -1,3 +1,15 @@
-data/
+# Default: ignore local data and run outputs
+data/*
 output/
 .venv/
+
+# Curated share pack for modeling collaborators (see README)
+!data/raw/
+data/raw/*
+!data/raw/curated/
+data/raw/curated/*
+!data/raw/curated/extracted_data.csv.gz
+!data/raw/curated/pa_occurrences.csv
+!data/raw/curated/filter_log.txt
+!data/raw/curated_taxon_keep.csv
+!data/raw/Flora_net.gpkg

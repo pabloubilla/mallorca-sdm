@@ -17,6 +17,12 @@
 - Stack: R (`data_preparation.R`) + Python 3.12 + PyTorch
 - Remote: `https://github.com/pabloubilla/mallorca-sdm`
 - Integrity: no inventar números; no autores/títulos en artwork
+- **Curated taxon set (2026-11-16):** excluir del dataset curado los taxones que **no** estén en la flora de Mallorca (clave / Quarta edició, `clave_Mll`) **ni** en el listado oficial de taxones alóctonos. Interpretación: errores / ruido de nomenclatura o geografía → mejor no incluir. Keep si está en flora Mallorca **o** en listado alóctonos.
+- **Listado alóctonos canónico:** `data/raw/Alien_Flora_Balearic_Records.xlsx` (join en `scripts/build_dataset_clave_aloctonas_review.py`; filtro en `scripts/apply_curated_taxon_filter.py`).
+- **Paper framing (2026-11-25):** canónico = *Beyond PO and PA* (niveles PAC/PAU/POV/POU); paper-dataset GeoPlant/MallorcaPlant descartado como primario.
+- **Mixes SDM justos:** PO y PA a grano de celda (`grouped=True`; PA pixels agregados a `UTMCODE1X1`).
+- Trabajo fino clave↔GBIF (`gbif_status`, reconciliación nombre a nombre en `clave_mallorca_especies.xlsx` / REVISION): **stand-by**; no bloquea el filtro de exclusión anterior.
+- Rescates `rescate_texto` / revisión 412 drop: **Later** (no bloquean curated Now).
 
 ## Open (USER)
 

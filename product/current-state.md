@@ -2,34 +2,34 @@
 
 ## Scope
 
-Deep SDM Mallorca — benchmark fuentes PAC/PAU/POV/POU + esfuerzo de muestreo.
+Beyond PO and PA — niveles PAC/PAU/POV/POU; inventario + transferencia SDM a PAC.
 
 ## Code
 
 GitHub: `pabloubilla/mallorca-sdm` (branch `main`).
 
-Pipeline (orden README):
+Pipeline:
 
 1. `data_preparation.R` / `rebuild_full_data_saez.py` → `data/raw/full_data_saez.gpkg`
-   - Fuentes: GBIF Flora (~707 m), **Saez/Puig_Major** (500 m), **Biel FLORA GBO Mallorca**, Biodibal, GBIF PO
-   - Biel cuadrículas → PAC vs PAU para GBO; columnas `source` + `coordinateUncertaintyInMeters` en GPKG
-   - Sin covariables (extract aparte)
-2. `extract_raster_data.py` → `extracted_data.csv` / `.gpkg`
-3. `preprocessing.py` → matrices `data/processed/`
-4. `run_model.py` / `sampling_effort.py` / `optimal_model.py` → `output/`
+2. `scripts/apply_curated_taxon_filter.py` → keep flora∪alóctonos → `full_data_saez_curated.gpkg` + `data/raw/curated/`
+3. `extract_raster_data.py` → `extracted_data.csv` (filtro curated reusa extract + `pa_occurrences`)
+4. `preprocessing.py --curated` → `data/processed/curated/`
+5. Análisis: `scripts/analyze_rarity_by_source.py`, `scripts/species_accumulation_mix.py`
+6. SDM: `sampling_effort.py` / `optimal_model.py` con `MALLORCA_PROCESSED_DIR=data/processed/curated` → `output/curated/`
 
-Diseño abierto: `notes.md` (loss mixes, hold-out PAC, CV espacial, occupancy Later).
+## Data (curated)
 
-## Data
-
-- `data/raw/Biel/`: FLORA GBO + Quadrícules + illots
-- `data/raw/Puig_Major.csv`: PA 500 m (Saez)
-- `output/` corridas previas — **no métricas locked** hasta re-run post-Biel
+- Keep: **1545** taxones (`en_clave_o_aloctonas=SI`); GPKG **1543** spp / **301 242** obs
+- Matrices curated: catálogo PAC ≥1 celda → **1259** spp
+- Listado alóctonos canónico: `data/raw/Alien_Flora_Balearic_Records.xlsx`
+- Review: `data/raw/dataset_clave_aloctonas_review.xlsx`
+- **Share pack in git** (~53 MB): `extracted_data.csv.gz` + `pa_occurrences.csv` + keep + `Flora_net.gpkg` — colaborador corre `preprocessing.py --curated` (matrices no van al repo)
 
 ## Manuscript
 
-- `manuscript_draft.md` en raíz
-- `manuscript/` LaTeX Wiley: **missing**
+- Paper canónico: `manuscript/mallorca-sdm-manuscript/main-2.tex` (Beyond PO and PA)
+- `main.tex` (dataset MallorcaPlant): **archivado / no primario**
+- Figuras/resultados curated: `output/curated/`
 
 ## Infrastructure
 
@@ -37,15 +37,14 @@ Diseño abierto: `notes.md` (loss mixes, hold-out PAC, CV espacial, occupancy La
 - NAS: `smb://dxp4800pro-14df.local/personal_folder/research/mallorca-sdm`
 - Product Lead: Iván Cortés-Fernández
 - Colaborador: Pablo Ubilla (INRIA Montpellier)
-- Portfolio card: `portfolio_research/projects/mallorca-sdm.md`
 
 ## Open checklist
 
 - [x] Product Lead = Iván; Pablo = colaborador INRIA
-- [x] Biel FLORA Mallorca + cuadrículas PAC/PAU en `data_preparation.R`
-- [x] `source` + incertidumbre por grano en esquema merge
-- [x] Re-run prep → `full_data_saez.gpkg` + taxonkey (Biel incluido; extract/preprocess pendiente)
+- [x] Biel FLORA Mallorca + cuadrículas PAC/PAU
+- [x] Filtro curated flora Mll ∪ alóctonos aplicado
 - [ ] Validar offsets A–D 500 m con Biel
 - [ ] Clusters PAC + LOCO
-- [ ] Journal + LaTeX Wiley
-- [ ] Lock métricas desde `output/` post re-run
+- [ ] Journal target
+- [ ] Lock métricas finales post cobertura raster completa
+- [ ] Rescates manuales 412 drop / `rescate_texto`

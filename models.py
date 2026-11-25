@@ -106,6 +106,15 @@ class MLP(nn.Module):
         return logits
 
 
+def phylo_laplacian_reg(weight: torch.Tensor, L: torch.Tensor) -> torch.Tensor:
+    """Phylogenetic Laplacian penalty on species head rows: Tr(W^T L W).
+
+    weight: (K, H) as in nn.Linear.weight
+    L: (K, K) symmetric Laplacian on the same species order
+    """
+    # Tr(W^T L W) = sum_{ij} L_ij <w_i, w_j>
+    return torch.trace(weight.T @ L @ weight)
+
 
 class SDMWithBias(nn.Module):
     """    species_head: B x C -> B x K
